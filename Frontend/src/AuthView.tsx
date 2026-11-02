@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { Icon } from "./Icon"
 import {
-  DEMO_ACCOUNTS,
   MIN_PASSWORD,
   login,
+  logout,
   registerManager,
   type Account,
 } from "./lib/store"
@@ -17,7 +17,8 @@ export function AuthView({
 }) {
   const [mode, setMode] = useState<Mode>("login")
   const [name, setName] = useState("")
-  const [email, setEmail] = useState<string>(DEMO_ACCOUNTS[1].email)
+  const [email, setEmail] = useState("")
+  const [loginRole, setLoginRole] = useState<"manager" | "cashier">("manager")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [passwordVisible, setPasswordVisible] = useState(false)
@@ -34,15 +35,10 @@ export function AuthView({
     setNotice("")
     setPassword("")
     setConfirm("")
-    setEmail(next === "login" ? DEMO_ACCOUNTS[1].email : "")
+    setEmail("")
+    setLoginRole("manager")
   }
 
-  function fillDemo(demo: (typeof DEMO_ACCOUNTS)[number]) {
-    setEmail(demo.email)
-    setPassword(demo.password)
-    setError("")
-    setNotice("")
-  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -60,6 +56,11 @@ export function AuthView({
     setLoading(false)
     if (!result.ok) {
       setError(result.error)
+      return
+    }
+    if (!registering && result.value.role !== loginRole) {
+      logout()
+      setError(`Akun ini bukan akun ${loginRole === "manager" ? "manajer" : "kasir"}. Pilih jenis akun yang sesuai.`)
       return
     }
     onAuthenticated(result.value)
@@ -253,23 +254,27 @@ export function AuthView({
           </p>
 
           {!registering && (
-            <div className="demo-account">
-              <span>Akun demo · ketuk untuk mengisi</span>
-              <div className="demo-account-list">
-                {DEMO_ACCOUNTS.map((demo) => (
-                  <button
-                    key={demo.email}
-                    onClick={() => fillDemo(demo)}
-                    type="button"
-                  >
-                    <strong>{demo.label}</strong>
-                    <small>
-                      {demo.email} · {demo.password}
-                    </small>
-                  </button>
-                ))}
+            <div className="login-role-choice" aria-label="Jenis akun">
+              <span>Masuk sebagai</span>
+              <div className="login-role-options">
+                <button
+                  aria-pressed={loginRole === "manager"}
+                  className={loginRole === "manager" ? "selected" : ""}
+                  onClick={() => setLoginRole("manager")}
+                  type="button"
+                >
+                  Manajer
+                </button>
+                <button
+                  aria-pressed={loginRole === "cashier"}
+                  className={loginRole === "cashier" ? "selected" : ""}
+                  onClick={() => setLoginRole("cashier")}
+                  type="button"
+                >
+                  Kasir
+                </button>
               </div>
-              <p>Akun kasir baru dibuat oleh manajer dari menu Tim.</p>
+              <p>Akun kasir dibuat oleh manajer dari menu Tim.</p>
             </div>
           )}
         </form>

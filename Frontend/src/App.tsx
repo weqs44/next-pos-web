@@ -21,6 +21,10 @@ import {
   recordTransaction,
   startShift,
   updateProfile,
+  listProducts,
+  addProduct,
+  toggleProduct,
+  deleteProduct as deleteStoredProduct,
   useStoreVersion,
   type Account,
   type Role,
@@ -190,7 +194,7 @@ function WorkspaceView({
 }: {
   products: Product[]
   query: string
-  onAddProduct: (product: Product) => void
+  onAddProduct: (product: Omit<Product, "id">) => void
   onToggleProduct: (id: number) => void
   onDeleteProduct: (id: number) => void
 }) {
@@ -206,7 +210,6 @@ function WorkspaceView({
     const parsedPrice = Number(price)
     if (!name.trim() || !parsedPrice) return
     onAddProduct({
-      id: Date.now(),
       name: name.trim(),
       description: description.trim() || "Menu baru",
       price: parsedPrice,
@@ -543,6 +546,7 @@ export default function App() {
     ensureSeed().then(() => {
       if (cancelled) return
       setAccount(currentAccount())
+      setProducts(listProducts())
       setReady(true)
     })
     return () => {
@@ -559,6 +563,7 @@ export default function App() {
     // signing in as a cashier clocks them in
     if (next.role === "cashier") startShift(next.id)
     setAccount(next)
+    setProducts(listProducts())
     setView(VIEWS_BY_ROLE[next.role][0])
     setCart({})
     setDiscount(null)
@@ -774,27 +779,29 @@ export default function App() {
     )
   }
 
-  function handlePay() {
+  async function handlePay() {
     if (!account || paying || !itemCount) return
+    setPaying(true)
     if (account.role === "cashier") {
-      const result = recordTransaction({
+      const result = await recordTransaction({
         cashierId: account.id,
         items: itemCount,
         subtotal,
         discount: discountAmount,
         tax,
         orderType,
+        guestCount: orderType === "Makan di tempat" ? guestCount : null,
       })
       if (!result.ok) {
         playSound("error")
         setMessage(result.error)
+        setPaying(false)
         return
       }
       setMessage(`Pembayaran #${result.value.number} berhasil`)
     }
     playChing()
     setPaid(true)
-    setPaying(true)
     // keep the success state visible for a moment, then start a fresh order
     window.setTimeout(() => {
       setCart({})
@@ -842,12 +849,23 @@ export default function App() {
   }
 
   function deleteProduct(id: number) {
-    setProducts((current) => current.filter((product) => product.id !== id))
-    setCart((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
+    const result = deleteStoredProduct(id)
+    if (!result.ok) { setMessage(result.error); return }
+    setProducts(listProducts())
+    setCart((current) => { const next = { ...current }; delete next[id]; return next })
+  }
+
+  async function createProduct(product: Omit<Product, "id">) {
+    const result = await addProduct(product)
+    if (!result.ok) { setMessage(result.error); return }
+    setProducts(listProducts())
+    setMessage("Menu berhasil ditambahkan")
+  }
+
+  function changeProductStatus(id: number) {
+    const result = toggleProduct(id)
+    if (!result.ok) { setMessage(result.error); return }
+    setProducts(listProducts())
   }
 
   function OrderPanel() {
@@ -1455,19 +1473,9 @@ export default function App() {
           />
         ) : (
           <WorkspaceView
-            onAddProduct={(product) =>
-              setProducts((current) => [product, ...current])
-            }
+            onAddProduct={createProduct}
             onDeleteProduct={deleteProduct}
-            onToggleProduct={(id) =>
-              setProducts((current) =>
-                current.map((product) =>
-                  product.id === id
-                    ? { ...product, active: !product.active }
-                    : product,
-                ),
-              )
-            }
+            onToggleProduct={changeProductStatus}
             products={products}
             query={query}
           />

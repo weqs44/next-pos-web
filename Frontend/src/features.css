@@ -9,11 +9,6 @@
 .auth-switch { margin: 16px 0 0; color: #7e899a; font-size: 11px; text-align: center; }
 .auth-switch button { padding: 2px 3px; border: 0; background: transparent; color: #16875e; font-size: 11px; font-weight: 800; }
 .auth-switch button:hover { text-decoration: underline; }
-.demo-account-list { margin-top: 9px; display: grid; gap: 7px; }
-.demo-account-list button { padding: 9px 11px; display: grid; gap: 2px; border: 1px solid #e3e8e6; border-radius: 10px; background: #fff; text-align: left; transition: border-color .2s ease, background .2s ease, transform .2s ease; }
-.demo-account-list button:hover { border-color: #16875e; background: #f4fff9; transform: translateY(-1px); }
-.demo-account-list strong { color: #26354d; font-size: 10px; }
-.demo-account-list small { color: #8993a2; font-size: 9px; }
 
 /* ---------- Sidebar: spacer keeps the profile at the bottom for every role ---------- */
 .nav-spacer { flex: 1; }
@@ -165,3 +160,10 @@
 .login-page { height: 100vh; height: 100dvh; overflow-y: auto; scrollbar-width: thin; }
 .login-form-panel { min-height: 100%; }
 .login-form { padding: 24px 0; }
+
+.login-role-choice { margin-top: 18px; }
+.login-role-choice > span { display: block; margin-bottom: 8px; color: #536075; font-size: 11px; font-weight: 700; }
+.login-role-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.login-role-options button { padding: 10px 12px; border: 1px solid #e3e8e6; border-radius: 10px; background: #fff; color: #536075; font-size: 12px; font-weight: 600; cursor: pointer; }
+.login-role-options button.selected { border-color: #16875e; background: #f1fbf6; color: #16875e; }
+.login-role-choice p { margin: 7px 0 0; color: #8993a2; font-size: 10px; line-height: 1.5; }

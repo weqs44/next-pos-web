@@ -88,7 +88,11 @@ export function OrdersView({
                   <span>
                     <strong>#{tx.number}</strong>
                     <small>
-                      {tx.orderType} · {formatTime(tx.at)}
+                      {tx.orderType}
+                      {tx.orderType === "Makan di tempat"
+                        ? ` · ${tx.guestCount != null ? `${tx.guestCount} tamu` : "jumlah tamu belum tersimpan"}`
+                        : ""}
+                      {` · ${formatTime(tx.at)}`}
                       {isManager && names[tx.cashierId]
                         ? ` · ${names[tx.cashierId]}`
                         : ""}
@@ -114,6 +118,12 @@ export function OrdersView({
                       <dt>Tipe</dt>
                       <dd>{tx.orderType}</dd>
                     </div>
+                    {tx.orderType === "Makan di tempat" && (
+                      <div>
+                        <dt>Jumlah tamu</dt>
+                        <dd>{tx.guestCount != null ? `${tx.guestCount} orang` : "Belum tersimpan"}</dd>
+                      </div>
+                    )}
                     <div>
                       <dt>Jumlah item</dt>
                       <dd>{tx.items}</dd>
