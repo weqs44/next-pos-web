@@ -35,6 +35,16 @@ def require_manager(request):
     if not actor or actor.role != 'manager' or not actor.active: return None
     return actor
 
+def manager_cashiers(manager):
+    # Kasir milik satu restoran = kasir yang didaftarkan oleh manajer tsb (Employee.created_by).
+    # Semua data kasir/shift/transaksi untuk manajer HARUS lewat queryset ini.
+    return Employee.objects.filter(role='cashier', created_by=manager)
+
+def menu_for(employee):
+    # Menu milik satu restoran = menu milik manajernya (manajer itu sendiri, atau manajer yang mendaftarkan kasir).
+    owner_id = employee.pk if employee.role == 'manager' else employee.created_by_id
+    return Product.objects.filter(owner_id=owner_id) if owner_id else Product.objects.none()
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -77,12 +87,15 @@ class BootstrapView(APIView):
     def get(self, request):
         me = employee_for(request.user)
         if not me or not me.active: return error('Akun tidak aktif.',403)
-        cashiers = Employee.objects.filter(role='cashier').select_related('user').order_by('id')
-        shifts = Shift.objects.all().order_by('-started_at')
-        transactions = Transaction.objects.all().order_by('-at')
-        if me.role == 'cashier':
-            shifts = shifts.filter(cashier=me); transactions = transactions.filter(cashier=me)
-        return Response({'account':account_data(me),'cashiers':AccountSerializer(cashiers,many=True).data,'shifts':ShiftSerializer(shifts,many=True).data,'transactions':TransactionSerializer(transactions[:5000],many=True).data,'products':ProductSerializer(Product.objects.all().order_by('id'),many=True).data})
+        if me.role == 'manager':
+            cashiers = manager_cashiers(me).select_related('user').order_by('id')
+            shifts = Shift.objects.filter(cashier__created_by=me).order_by('-started_at')
+            transactions = Transaction.objects.filter(cashier__created_by=me).order_by('-at')
+        else:
+            cashiers = Employee.objects.filter(pk=me.pk).select_related('user')
+            shifts = Shift.objects.filter(cashier=me).order_by('-started_at')
+            transactions = Transaction.objects.filter(cashier=me).order_by('-at')
+        return Response({'account':account_data(me),'cashiers':AccountSerializer(cashiers,many=True).data,'shifts':ShiftSerializer(shifts,many=True).data,'transactions':TransactionSerializer(transactions[:5000],many=True).data,'products':ProductSerializer(menu_for(me).order_by('id'),many=True).data})
 
 class ProfileView(APIView):
     def patch(self, request):
@@ -110,7 +123,7 @@ class CashierCollectionView(APIView):
     def patch(self, request):
         actor=require_manager(request)
         if not actor: return error('Hanya manajer yang dapat mengubah status kasir.',403)
-        target=Employee.objects.filter(pk=request.data.get('id'),role='cashier').first()
+        target=manager_cashiers(actor).filter(pk=request.data.get('id')).first()
         if not target: return error('Kasir tidak ditemukan.',404)
         target.active=bool(request.data.get('active')); target.save(update_fields=['active'])
         if not target.active: Shift.objects.filter(cashier=target,ended_at__isnull=True).update(ended_at=int(time.time()*1000))
@@ -118,8 +131,9 @@ class CashierCollectionView(APIView):
 
 class CashierPasswordView(APIView):
     def post(self, request):
-        if not require_manager(request): return error('Hanya manajer yang dapat mengatur ulang kata sandi.',403)
-        target=Employee.objects.filter(pk=request.data.get('id'),role='cashier').select_related('user').first()
+        actor=require_manager(request)
+        if not actor: return error('Hanya manajer yang dapat mengatur ulang kata sandi.',403)
+        target=manager_cashiers(actor).filter(pk=request.data.get('id')).select_related('user').first()
         password=str(request.data.get('password',''))
         if not target: return error('Kasir tidak ditemukan.',404)
         if len(password)<6: return error('Kata sandi minimal 6 karakter.')
@@ -174,17 +188,20 @@ class TransactionView(APIView):
         return Response(TransactionSerializer(tx).data,status=201)
 
 class ProductCollectionView(APIView):
-    def get(self, request): return Response(ProductSerializer(Product.objects.all().order_by('id'),many=True).data)
+    def get(self, request):
+        me=employee_for(request.user)
+        if not me or not me.active: return error('Akun tidak aktif.',403)
+        return Response(ProductSerializer(menu_for(me).order_by('id'),many=True).data)
     def post(self, request):
         actor=employee_for(request.user)
         if not actor or actor.role!='manager': return error('Hanya manajer yang dapat mengelola menu.',403)
         serializer=ProductSerializer(data=request.data)
         if not serializer.is_valid(): return Response(serializer.errors,status=400)
-        serializer.save(); return Response(serializer.data,status=201)
+        serializer.save(owner=actor); return Response(serializer.data,status=201)
     def patch(self, request):
         actor=employee_for(request.user)
         if not actor or actor.role!='manager': return error('Hanya manajer yang dapat mengelola menu.',403)
-        product=Product.objects.filter(pk=request.data.get('id')).first()
+        product=Product.objects.filter(pk=request.data.get('id'),owner=actor).first()
         if not product: return error('Menu tidak ditemukan.',404)
         if 'active' in request.data: product.active=bool(request.data['active'])
         for key in ['name','description','price','category','image','tag']:
@@ -193,7 +210,7 @@ class ProductCollectionView(APIView):
     def delete(self, request):
         actor=employee_for(request.user)
         if not actor or actor.role!='manager': return error('Hanya manajer yang dapat mengelola menu.',403)
-        product=Product.objects.filter(pk=request.data.get('id')).first()
+        product=Product.objects.filter(pk=request.data.get('id'),owner=actor).first()
         if not product: return error('Menu tidak ditemukan.',404)
         product.delete(); return Response({'ok':True})
 

@@ -30,6 +30,7 @@ class Transaction(models.Model):
     guest_count = models.PositiveIntegerField(null=True, blank=True, default=None)
 
 class Product(models.Model):
+    owner = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=120)
     description = models.CharField(max_length=300, blank=True, default='')
     price = models.PositiveIntegerField()
