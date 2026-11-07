@@ -1,0 +1,48 @@
+# Contoh: frontend (hasil `npm run build`) + API Django (gunicorn) di satu domain.
+# Pasang TLS (mis. certbot) atau terminasi TLS di load balancer; header X-Forwarded-Proto wajib benar.
+server {
+    listen 80;
+    server_name pos.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name pos.example.com;
+    # ssl_certificate     /etc/letsencrypt/live/pos.example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/pos.example.com/privkey.pem;
+
+    root /var/www/next-pos;          # salin isi Frontend/dist ke sini
+    index index.html;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+
+    client_max_body_size 2m;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Hanya perlu jika DJANGO_ENABLE_ADMIN=1
+    location ~ ^/(admin|static)/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}

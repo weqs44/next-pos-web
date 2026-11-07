@@ -7,6 +7,10 @@ const DAY = 86_400_000
 
 const pct = (value: number) => `${Math.abs(value).toFixed(1).replace(".", ",")}%`
 
+// "2× Nasi goreng, 1× Es teh". Kosong untuk pesanan lama yang rinciannya belum tersimpan.
+const itemsSummary = (tx: Transaction) =>
+  (tx.lines ?? []).map((line) => `${line.quantity}× ${line.name}`).join(", ")
+
 /* ------------------------------------------------------------------ */
 /*  Orders: real transactions recorded when a cashier presses Bayar     */
 /* ------------------------------------------------------------------ */
@@ -33,7 +37,7 @@ export function OrdersView({
     .filter(
       (tx) =>
         !needle ||
-        `${tx.number} ${names[tx.cashierId] ?? ""} ${tx.orderType}`
+        `${tx.number} ${names[tx.cashierId] ?? ""} ${tx.orderType} ${itemsSummary(tx)}`
           .toLowerCase()
           .includes(needle),
     )
@@ -67,7 +71,7 @@ export function OrdersView({
           <h3>{needle ? "Pesanan tidak ditemukan" : "Belum ada pesanan hari ini"}</h3>
           <p>
             {needle
-              ? "Coba nomor pesanan atau nama kasir lain."
+              ? "Coba nomor pesanan, nama kasir, atau nama menu lain."
               : "Pesanan yang sudah dibayar akan muncul di sini."}
           </p>
         </div>
@@ -75,6 +79,7 @@ export function OrdersView({
         <div className="order-list">
           {visible.map((tx) => {
             const isOpen = openId === tx.id
+            const summary = itemsSummary(tx)
             return (
               <div className={`order-entry ${isOpen ? "open" : ""}`} key={tx.id}>
                 <button
@@ -87,6 +92,7 @@ export function OrdersView({
                   </span>
                   <span>
                     <strong>#{tx.number}</strong>
+                    {summary && <span className="order-items">{summary}</span>}
                     <small>
                       {tx.orderType}
                       {tx.orderType === "Makan di tempat"
@@ -106,6 +112,27 @@ export function OrdersView({
                 </button>
                 {isOpen && (
                   <dl className="order-detail">
+                    <div className="order-detail-items">
+                      <dt>Menu dipesan</dt>
+                      <dd>
+                        {tx.lines && tx.lines.length > 0 ? (
+                          <ul className="order-lines">
+                            {tx.lines.map((line, index) => (
+                              <li key={index}>
+                                <span>
+                                  {line.quantity}× {line.name}
+                                </span>
+                                <span>{rupiah.format(line.unitPrice * line.quantity)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="order-lines-empty">
+                            Rincian menu tidak tersimpan untuk pesanan ini.
+                          </span>
+                        )}
+                      </dd>
+                    </div>
                     <div>
                       <dt>Waktu</dt>
                       <dd>{formatTime(tx.at)}</dd>
@@ -220,13 +247,14 @@ export function ReportView({
       onMessage("Belum ada transaksi hari ini untuk diunduh")
       return
     }
-    const header = ["Nomor", "Waktu", "Kasir", "Tipe", "Item", "Subtotal", "Diskon", "Pajak", "Total"]
+    const header = ["Nomor", "Waktu", "Kasir", "Tipe", "Menu", "Item", "Subtotal", "Diskon", "Pajak", "Total"]
     const lines = [...todays].reverse().map((tx) =>
       [
         tx.number,
         new Date(tx.at).toLocaleString("id-ID"),
         `"${(names[tx.cashierId] ?? "").replace(/"/g, '""')}"`,
         tx.orderType,
+        `"${itemsSummary(tx).replace(/×/g, "x").replace(/"/g, '""')}"`,
         tx.items,
         tx.subtotal,
         tx.discount ?? 0,

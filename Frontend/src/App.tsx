@@ -6,6 +6,7 @@ import { Icon, type IconName } from "./Icon"
 import { TeamView } from "./TeamView"
 import { isMuted, playChing, playSound, setMuted, soundForTarget } from "./lib/sound"
 import { formatRelative, formatTime, initials, rupiah } from "./lib/format"
+import { PLACEHOLDER_IMAGE, compressImage } from "./lib/image"
 import { OrdersView, ReportView } from "./SalesViews"
 import {
   activeShift,
@@ -13,6 +14,9 @@ import {
   currentShiftStats,
   endShift,
   ensureSeed,
+  getTaxRate,
+  notify,
+  subscribeMessages,
   listCashiers,
   listShifts,
   listTransactions,
@@ -30,24 +34,6 @@ import {
   type Role,
 } from "./lib/store"
 
-const photos = {
-  table:
-    "https://images.unsplash.com/photo-1643757343278-5d50309dfa44?auto=format&fit=crop&w=900&q=85",
-  pizza:
-    "https://images.unsplash.com/photo-1624340209361-bfad6e30dbf4?auto=format&fit=crop&w=900&q=85",
-  burger:
-    "https://images.unsplash.com/photo-1575367439051-9be800a160d8?auto=format&fit=crop&w=900&q=85",
-  greenPizza:
-    "https://images.unsplash.com/photo-1622257892554-c162e47a3a5e?auto=format&fit=crop&w=900&q=85",
-  feast:
-    "https://images.unsplash.com/photo-1653026645442-5dae0f5b9090?auto=format&fit=crop&w=900&q=85",
-  wine: "https://images.unsplash.com/photo-1733159680303-1bd3875eb71b?auto=format&fit=crop&w=900&q=85",
-  cocktail:
-    "https://images.unsplash.com/photo-1756572323135-d242095298ec?auto=format&fit=crop&w=900&q=85",
-  pizzas:
-    "https://images.unsplash.com/photo-1659367736714-e3f0344a6266?auto=format&fit=crop&w=900&q=85",
-}
-
 type Product = {
   id: number
   name: string
@@ -59,95 +45,11 @@ type Product = {
   active: boolean
 }
 
-const initialProducts: Product[] = [
-  {
-    id: 1,
-    name: "Menu 1",
-    description: "Gurih banget",
-    price: 69000,
-    category: "Burger",
-    image: photos.burger,
-    tag: "Terlaris",
-    active: true,
-  },
-  {
-    id: 2,
-    name: "Menu 2",
-    description: "Mama mia",
-    price: 58000,
-    category: "Pizza",
-    image: photos.pizza,
-    tag: "Klasik",
-    active: true,
-  },
-  {
-    id: 3,
-    name: "Menu 3",
-    description: "Sehat banget",
-    price: 55000,
-    category: "Mangkok",
-    image: photos.feast,
-    tag: "Nabati",
-    active: true,
-  },
-  {
-    id: 4,
-    name: "Menu 4",
-    description: "Lezatos",
-    price: 72000,
-    category: "Pizza",
-    image: photos.greenPizza,
-    tag: "Baru",
-    active: true,
-  },
-  {
-    id: 5,
-    name: "Menu 5",
-    description: "Hola como estas",
-    price: 64000,
-    category: "Taco",
-    image: photos.table,
-    tag: "Pilihan koki",
-    active: true,
-  },
-  {
-    id: 6,
-    name: "Menu 6",
-    description: "Seger banget",
-    price: 32000,
-    category: "Minuman",
-    image: photos.cocktail,
-    tag: "Tanpa alkohol",
-    active: true,
-  },
-  {
-    id: 7,
-    name: "Menu 7",
-    description: "Kenyang banget",
-    price: 85000,
-    category: "Pendamping",
-    image: photos.wine,
-    tag: "Terbatas",
-    active: true,
-  },
-  {
-    id: 8,
-    name: "Menu 8",
-    description: "Rame banget",
-    price: 76000,
-    category: "Pizza",
-    image: photos.pizzas,
-    tag: "Untuk berbagi",
-    active: true,
-  },
-]
-
 const categories = [
   "Semua menu",
-  "Burger",
-  "Pizza",
-  "Mangkok",
-  "Taco",
+  "Makanan berat",
+  "Pembuka",
+  "Penutup",
   "Pendamping",
   "Minuman",
 ]
@@ -202,7 +104,7 @@ function WorkspaceView({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
-  const [productCategory, setProductCategory] = useState("Burger")
+  const [productCategory, setProductCategory] = useState("Makanan berat")
   const [image, setImage] = useState("")
 
   function submitProduct(event: React.FormEvent) {
@@ -214,7 +116,7 @@ function WorkspaceView({
       description: description.trim() || "Menu baru",
       price: parsedPrice,
       category: productCategory,
-      image: image || photos.feast,
+      image: image,
       tag: "Baru",
       active: true,
     })
@@ -225,12 +127,17 @@ function WorkspaceView({
     setFormOpen(false)
   }
 
-  function readImage(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
+  async function readImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.target
+    const file = input.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setImage(String(reader.result))
-    reader.readAsDataURL(file)
+    try {
+      setImage(await compressImage(file))
+    } catch (error) {
+      setImage("")
+      notify((error as Error).message)
+    }
+    input.value = ""
   }
 
   return (
@@ -323,7 +230,7 @@ function WorkspaceView({
             className={!product.active ? "menu-disabled" : ""}
             key={product.id}
           >
-            <img alt={product.name} src={product.image} />
+            <img alt={product.name} src={product.image || PLACEHOLDER_IMAGE} />
             <div>
               <strong>{product.name}</strong>
               <span>
@@ -483,7 +390,7 @@ export default function App() {
   const [account, setAccount] = useState<Account | null>(null)
   const [category, setCategory] = useState("Semua menu")
   const [requestedView, setView] = useState<View>("kasir")
-  const [products, setProducts] = useState<Product[]>(initialProducts)
+  const [products, setProducts] = useState<Product[]>(() => listProducts())
   const [query, setQuery] = useState("")
   const [cart, setCart] = useState<Cart>({})
   const [cartOpen, setCartOpen] = useState(false)
@@ -553,6 +460,14 @@ export default function App() {
       cancelled = true
     }
   }, [])
+
+  // errors from the data layer (failed saves, etc.) surface as toasts
+  useEffect(() => subscribeMessages(setMessage), [])
+
+  // keep the menu in sync when the store changes (e.g. a failed save rolled back, or another tab)
+  useEffect(() => {
+    if (ready && account) setProducts(listProducts())
+  }, [ready, account, storeVersion])
 
   // if the signed-in account is removed or deactivated (e.g. from another tab), sign out
   useEffect(() => {
@@ -631,7 +546,7 @@ export default function App() {
     ? Math.min(
         subtotal,
         discount.type === "percent"
-          ? Math.round((subtotal * discount.value) / 100)
+          ? Math.round((subtotal * Math.round(discount.value * 10)) / 1000) // integer math: matches the server's exact rounding
           : discount.value,
       )
     : 0
@@ -641,7 +556,7 @@ export default function App() {
       : rupiah.format(discount.value)
     : ""
   const taxable = subtotal - discountAmount
-  const tax = taxable * 0.11
+  const tax = Math.round(taxable * getTaxRate())
   const total = taxable + tax
 
   // a discount belongs to one order: drop it when the cart is emptied
@@ -746,7 +661,7 @@ export default function App() {
   function updateCart(id: number, change: number) {
     setPaid(false)
     setCart((current) => {
-      const nextQuantity = (current[id] || 0) + change
+      const nextQuantity = Math.min(99, (current[id] || 0) + change)
       const next = { ...current }
       if (nextQuantity <= 0) delete next[id]
       else next[id] = nextQuantity
@@ -781,14 +696,20 @@ export default function App() {
 
   async function handlePay() {
     if (!account || paying || !itemCount) return
+    if (account.role !== "cashier") {
+      // only cashiers can record sales; never show a fake "paid" state that is not saved
+      setMessage("Hanya akun kasir yang dapat memproses pembayaran")
+      return
+    }
     setPaying(true)
     if (account.role === "cashier") {
       const result = await recordTransaction({
         cashierId: account.id,
-        items: itemCount,
-        subtotal,
-        discount: discountAmount,
-        tax,
+        lines: cartItems.map((product) => ({
+          productId: product.id,
+          qty: cart[product.id],
+        })),
+        discount: discount ? { type: discount.type, value: discount.value } : null,
         orderType,
         guestCount: orderType === "Makan di tempat" ? guestCount : null,
       })
@@ -967,7 +888,7 @@ export default function App() {
           {cartItems.length ? (
             cartItems.map((product) => (
               <div className="cart-item" key={product.id}>
-                <img alt="" src={product.image} />
+                <img alt="" src={product.image || PLACEHOLDER_IMAGE} />
                 <div className="cart-item-main">
                   <div className="cart-item-top">
                     <div>
@@ -1414,7 +1335,7 @@ export default function App() {
               {filtered.map((product) => (
                 <article className="product-card" key={product.id}>
                   <div className="product-image">
-                    <img alt={product.name} src={product.image} />
+                    <img alt={product.name} src={product.image || PLACEHOLDER_IMAGE} />
                     <span>{product.tag}</span>
                     <button
                       aria-label={`Tambah ${product.name}`}

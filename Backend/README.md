@@ -1,134 +1,65 @@
 # NEXT-POS Backend
 
-Backend untuk aplikasi **NEXT-POS**, sistem Point of Sale (POS) berbasis Django yang menyediakan API untuk kebutuhan autentikasi, manajemen karyawan, shift, produk, dan transaksi.
+Backend aplikasi **NEXT-POS** (Point of Sale): Django + Django REST Framework + MySQL. Menyediakan API untuk autentikasi, karyawan, shift, menu, dan transaksi.
 
 ## Tech Stack
 
-- Python 3.15
-- Django 5.2.18
-- Django REST Framework
-- MySQL
-- Django CORS Headers
+- Python 3.12 – 3.13
+- Django 5.2 LTS, Django REST Framework
+- MySQL 8 (SQLite didukung untuk pengembangan/tes)
+- gunicorn + WhiteNoise untuk produksi
 
-## Project Structure
+## Pengembangan lokal
+
+```bash
+cd Backend
+python -m venv .venv
+# Windows: .\.venv\Scripts\Activate.ps1      Linux/macOS: source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env        # Windows: Copy-Item .env.example .env
+```
+
+Edit `.env` untuk lokal:
+
+```env
+DJANGO_DEBUG=1
+DB_ENGINE=sqlite            # atau isi kredensial MySQL
+```
+
+```bash
+python manage.py migrate
+python manage.py runserver      # http://127.0.0.1:8000/
+```
+
+Jika memakai MySQL: buat database dulu (`CREATE DATABASE next_pos CHARACTER SET utf8mb4;`) dan isi `DB_*` di `.env`.
+
+## Tes
+
+```bash
+DJANGO_DEBUG=1 DB_ENGINE=sqlite python manage.py test
+```
+
+(PowerShell: `$env:DJANGO_DEBUG="1"; $env:DB_ENGINE="sqlite"; python manage.py test`)
+
+## Aturan penting API
+
+- Nominal transaksi (harga, diskon, pajak, total) **dihitung server** dari harga menu di database. Klien hanya mengirim `lines: [{productId, qty}]`, `discount: {type: "percent"|"amount", value}`, `orderType`, `guestCount`.
+- Token kedaluwarsa setelah `TOKEN_TTL_DAYS` (30 hari); token kasir dicabut saat dinonaktifkan atau kata sandinya direset.
+- Login dan pendaftaran dibatasi lajunya (rate limit). Kata sandi minimal 8 karakter dan tidak boleh umum/angka saja.
+
+## Produksi
+
+Lihat [`../DEPLOY.md`](../DEPLOY.md). Ringkasnya: `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY` acak (aplikasi menolak start tanpa itu), HTTPS di depan aplikasi, `migrate`, `collectstatic`, jalankan dengan gunicorn.
+
+## Struktur
 
 ```text
 Backend/
-├── core/
-│   ├── migrations/
-│   ├── models.py
-│   ├── serializers.py
-│   ├── views.py
-│   ├── urls.py
-│   └── apps.py
-│
-├── nextpos/
-│   ├── settings.py
-│   ├── urls.py
-│   ├── asgi.py
-│   └── wsgi.py
-│
+├── core/            # models, serializers, views, authentication, tests, migrations
+├── nextpos/         # settings, urls, wsgi/asgi
+├── Dockerfile
+├── gunicorn.conf.py
 ├── .env.example
-├── .gitignore
 ├── manage.py
 └── requirements.txt
 ```
-
-## Requirements
-
-Pastikan perangkat sudah memiliki:
-
-- Python
-- MySQL Server
-- Git
-
-## Installation
-
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/willfredsh-star/next-pos-web.git
-```
-
-Masuk ke folder Backend:
-
-```bash
-cd next-pos-web/Backend
-```
-
-### 2. Create Virtual Environment
-
-```bash
-py -m venv .venv
-```
-
-Aktifkan virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### 3. Install Dependencies
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables
-
-Buat file `.env` berdasarkan template yang tersedia:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Buka file `.env`, kemudian sesuaikan konfigurasi dengan lingkungan lokal, termasuk kredensial database.
-
-**Jangan mengunggah file `.env` ke repository.**
-
-### 5. Setup Database
-
-Buat database MySQL sesuai nama database yang dikonfigurasi di `.env`.
-
-Contoh:
-
-```sql
-CREATE DATABASE next_pos;
-```
-
-Pastikan MySQL Server sedang berjalan dan konfigurasi koneksi database sudah benar.
-
-### 6. Run Database Migrations
-
-```bash
-python manage.py migrate
-```
-
-### 7. Start Development Server
-
-```bash
-python manage.py runserver
-```
-
-Backend akan berjalan secara default di:
-
-```text
-http://127.0.0.1:8000/
-```
-
-## Development Notes
-
-- Gunakan virtual environment untuk mengelola dependencies.
-- Jangan commit `.env`, `.venv`, atau file database lokal.
-- Jika terdapat perubahan pada Django models, buat migration menggunakan:
-
-```bash
-python manage.py makemigrations
-python manage.py migrate
-```
-
-- Setelah melakukan pull perubahan dari repository, periksa apakah ada dependencies atau migrations baru.
-
-## License
-
-This project is developed for the NEXT-POS application.
