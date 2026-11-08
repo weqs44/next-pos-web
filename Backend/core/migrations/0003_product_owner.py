@@ -1,6 +1,8 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
+from ._tidb_compat import AddNullableForeignKeySplit
+
 
 class Migration(migrations.Migration):
 
@@ -9,37 +11,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Pisahkan ADD COLUMN dan ADD FOREIGN KEY agar kompatibel dengan TiDB.
-        migrations.SeparateDatabaseAndState(
-            database_operations=[
-                migrations.RunSQL(
-                    sql='ALTER TABLE `core_product` ADD COLUMN `owner_id` bigint NULL',
-                    reverse_sql='ALTER TABLE `core_product` DROP COLUMN `owner_id`',
-                ),
-                migrations.RunSQL(
-                    sql=(
-                        'ALTER TABLE `core_product` '
-                        'ADD CONSTRAINT `core_product_owner_id_fk_core_employee_id` '
-                        'FOREIGN KEY (`owner_id`) REFERENCES `core_employee` (`id`)'
-                    ),
-                    reverse_sql=(
-                        'ALTER TABLE `core_product` '
-                        'DROP FOREIGN KEY `core_product_owner_id_fk_core_employee_id`'
-                    ),
-                ),
-            ],
-            state_operations=[
-                migrations.AddField(
-                    model_name='product',
-                    name='owner',
-                    field=models.ForeignKey(
-                        blank=True,
-                        null=True,
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name='products',
-                        to='core.employee',
-                    ),
-                ),
-            ],
+        # MySQL/TiDB: ADD COLUMN dan ADD FOREIGN KEY dipisah (TiDB). Database lain (SQLite untuk tes/CI): AddField standar.
+        AddNullableForeignKeySplit(
+            model_name='product',
+            name='owner',
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='products',
+                to='core.employee',
+            ),
+            fk_name='core_product_owner_id_fk_core_employee_id',
         ),
     ]
