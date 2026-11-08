@@ -388,11 +388,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(86, 255, 186
 .hourly-chart-summary strong { color: #14223a; font: 700 17px "Space Grotesk", sans-serif; }
 .hourly-chart-summary small { color: #8490a1; font-size: 10px; }
 .hourly-chart-scroll { width: 100%; margin-top: 18px; overflow-x: auto; }
-.hourly-chart-svg { display: block; width: 100%; min-width: 620px; height: auto; overflow: visible; }
+.hourly-chart-svg { display: block; width: 100%; min-width: 760px; height: auto; overflow: visible; }
 .hourly-grid-line { stroke: #e9edf0; stroke-width: 1; stroke-dasharray: 4 5; }
 .hourly-axis-line { stroke: #cfd7df; stroke-width: 1.2; }
-.hourly-y-label, .hourly-x-label { fill: #7d8999; font: 600 11px "DM Sans", sans-serif; }
-.hourly-line { fill: none; stroke: #16875e; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.hourly-y-label, .hourly-x-label { fill: #7d8999; font: 700 12px "DM Sans", sans-serif; }
+.hourly-line { fill: none; stroke: #16875e; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: miter; }
 .hourly-point { fill: #fff; stroke: #16875e; stroke-width: 3; cursor: pointer; transition: r .15s ease, fill .15s ease; }
 .hourly-point:hover, .hourly-point:focus { r: 7; fill: #dff7ec; outline: none; }
 .hourly-overlay-label { fill: #8792a1; font: 700 13px "DM Sans", sans-serif; }
