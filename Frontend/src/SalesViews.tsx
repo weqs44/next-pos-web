@@ -273,12 +273,17 @@ export function ReportView({
     }
   }, [dateKey, timezone, transactions])
 
-  const slots = hourly?.hours ?? []
+  const slots = hourly
+    ? Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, index) => {
+        const hour = FIRST_HOUR + index
+        return hourly.hours.find((slot) => slot.hour === hour) ?? { hour, sales: 0, orders: 0 }
+      })
+    : []
   const maximum = niceMaximum(Math.max(0, ...slots.map((slot) => slot.sales)))
   const plotWidth = CHART_WIDTH - CHART_MARGIN.left - CHART_MARGIN.right
   const plotHeight = CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom
   const x = (hour: number) =>
-    CHART_MARGIN.left + ((hour - FIRST_HOUR) / (LAST_HOUR + 1 - FIRST_HOUR)) * plotWidth
+    CHART_MARGIN.left + ((hour - FIRST_HOUR) / (LAST_HOUR - FIRST_HOUR)) * plotWidth
   const y = (amount: number) =>
     CHART_MARGIN.top + plotHeight - (amount / maximum) * plotHeight
   const line = slots.map((slot) => `${x(slot.hour)},${y(slot.sales)}`).join(" ")
