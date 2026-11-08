@@ -357,7 +357,7 @@ export function ReportView({
           </div>
           <div className="hourly-chart-summary">
             <strong>{rupiah.format(hourly?.totalSales ?? 0)}</strong>
-            <small>{hourly?.totalOrders ?? 0} pesanan hari ini</small>
+            <small>{hourly?.totalOrders ?? 0} pesanan · 07.00–23.00</small>
           </div>
         </div>
         {hourlyError ? (
