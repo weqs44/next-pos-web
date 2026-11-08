@@ -190,7 +190,7 @@ export function OrdersView({
 
 
 const FIRST_HOUR = 7
-const LAST_HOUR = 22
+const LAST_HOUR = 23
 const CHART_WIDTH = 920
 const CHART_HEIGHT = 340
 const CHART_MARGIN = { top: 22, right: 26, bottom: 54, left: 100 }
@@ -429,7 +429,7 @@ export function ReportView({
                   x={x(hour)}
                   y={CHART_HEIGHT - 18}
                   className="hourly-x-label"
-                  textAnchor={hour === 23 ? "end" : hour === 7 ? "start" : "middle"}
+                  textAnchor="middle"
                 >
                   {String(hour).padStart(2, "0")}.00
                 </text>
