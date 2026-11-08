@@ -381,7 +381,7 @@ class HourlySalesView(APIView):
             at__lt=end_ms,
         ).values_list('at', 'total')
 
-        slots = {hour: {'hour': hour, 'sales': 0, 'orders': 0} for hour in range(7, 23)}
+        slots = {hour: {'hour': hour, 'sales': 0, 'orders': 0} for hour in range(7, 24)}
         for timestamp, total in transactions.iterator():
             hour = datetime.fromtimestamp(timestamp / 1000, tz=zone).hour
             if hour in slots:
@@ -393,7 +393,7 @@ class HourlySalesView(APIView):
             'date': report_date.isoformat(),
             'timezone': zone_name,
             'startHour': 7,
-            'endHour': 23,
+            'endHour': 24,
             'totalSales': sum(slot['sales'] for slot in data),
             'totalOrders': sum(slot['orders'] for slot in data),
             'hours': data,
