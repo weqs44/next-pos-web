@@ -283,7 +283,7 @@ export function ReportView({
     CHART_MARGIN.top + plotHeight - (amount / maximum) * plotHeight
   const line = slots.map((slot) => `${x(slot.hour)},${y(slot.sales)}`).join(" ")
   const yTicks = Array.from({ length: 5 }, (_, index) => (maximum / 4) * index)
-  const xTicks = [7, 10, 13, 16, 19, 22, 23]
+  const xTicks = Array.from({ length: 9 }, (_, index) => FIRST_HOUR + index * 2)
 
   function downloadReport() {
     if (!todays.length) {
