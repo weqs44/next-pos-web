@@ -10,7 +10,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction as db_transaction
-from django.db.models import Max, Q
+from django.db.models import Max, Prefetch, Q
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -179,14 +179,35 @@ class BootstrapView(APIView):
     def get(self, request):
         me = employee_for(request.user)
         if not me or not me.active: return error('Akun tidak aktif.', 403)
+        # Bootstrap masih mengembalikan seluruh rentang data yang sama agar riwayat,
+        # laporan, dan ringkasan tim tidak berubah. Ambil hanya kolom yang dipakai
+        # serializer supaya TiDB tidak membaca kolom relasi/metadata yang tidak diperlukan.
+        line_fields = ('id', 'transaction_id', 'name', 'unit_price', 'quantity')
+        transaction_fields = (
+            'id', 'number', 'cashier_id', 'shift_id', 'at', 'items',
+            'subtotal', 'discount', 'tax', 'total', 'order_type', 'guest_count',
+        )
+        shift_fields = ('id', 'cashier_id', 'started_at', 'ended_at')
+        line_queryset = TransactionItem.objects.only(*line_fields).order_by('id')
+
         if me.role == 'manager':
             cashiers = manager_cashiers(me).select_related('user').order_by('id')
-            shifts = Shift.objects.filter(cashier__created_by=me).order_by('-started_at')
-            transactions = Transaction.objects.filter(cashier__created_by=me).order_by('-at').prefetch_related('lines')
+            shifts = Shift.objects.filter(cashier__created_by=me).only(*shift_fields).order_by('-started_at')
+            transactions = (
+                Transaction.objects.filter(cashier__created_by=me)
+                .only(*transaction_fields)
+                .order_by('-at')
+                .prefetch_related(Prefetch('lines', queryset=line_queryset))
+            )
         else:
             cashiers = Employee.objects.filter(pk=me.pk).select_related('user')
-            shifts = Shift.objects.filter(cashier=me).order_by('-started_at')
-            transactions = Transaction.objects.filter(cashier=me).order_by('-at').prefetch_related('lines')
+            shifts = Shift.objects.filter(cashier=me).only(*shift_fields).order_by('-started_at')
+            transactions = (
+                Transaction.objects.filter(cashier=me)
+                .only(*transaction_fields)
+                .order_by('-at')
+                .prefetch_related(Prefetch('lines', queryset=line_queryset))
+            )
         manager = manager_of(me)
         next_number = next_order_number(manager) if manager else 1
         return Response({
