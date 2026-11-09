@@ -9,6 +9,7 @@ services:
     # Paket gratis tidak punya pre-deploy command, jadi migrasi dijalankan saat start (aman: 1 instance),
     # tetapi hanya bila ada migrasi tertunda (lihat start.sh). Service gratis tidur saat idle dan start
     # ulang tiap bangun; `migrate` tanpa pengecekan di sini memboroskan Request Unit TiDB.
+    # (Dipakai hanya bila deploy ke Render; di platform lain Dockerfile memakai start.sh yang sama.)
     startCommand: sh start.sh
     healthCheckPath: /api/health/
     envVars:
