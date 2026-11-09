@@ -456,8 +456,6 @@ function AccountSettingsView({
   )
 }
 
-const MAX_CART_QUANTITY = 99
-
 /* Jumlah pesanan yang bisa diketik langsung. Draf teks disimpan lokal dan baru diterapkan saat Enter atau
    saat kolom ditinggalkan, jadi mengosongkan kolom untuk mengetik angka baru tidak menghapus menu. */
 function QuantityInput({
@@ -477,7 +475,7 @@ function QuantityInput({
     setDraft(null)
     // Kosong atau 0 dianggap salah ketik: kembali ke jumlah semula. Untuk menghapus menu ada tombol tempat sampah.
     if (Number.isNaN(typed) || typed < 1) return
-    const next = Math.min(MAX_CART_QUANTITY, typed)
+    const next = typed
     if (next !== value) onCommit(next)
   }
 
@@ -486,9 +484,9 @@ function QuantityInput({
       aria-label={label}
       className="quantity-input"
       inputMode="numeric"
-      maxLength={2}
+      
       onBlur={commit}
-      onChange={(event) => setDraft(event.target.value.replace(/\D/g, "").slice(0, 2))}
+      onChange={(event) => setDraft(event.target.value.replace(/\D/g, ""))}
       onFocus={(event) => event.target.select()}
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur()
@@ -780,7 +778,7 @@ export default function App() {
   function updateCart(id: number, change: number) {
     setPaid(false)
     setCart((current) => {
-      const nextQuantity = Math.min(99, (current[id] || 0) + change)
+      const nextQuantity = (current[id] || 0) + change
       const next = { ...current }
       if (nextQuantity <= 0) delete next[id]
       else next[id] = nextQuantity
@@ -793,7 +791,7 @@ export default function App() {
     setCart((current) => {
       const next = { ...current }
       if (quantity <= 0) delete next[id]
-      else next[id] = Math.min(MAX_CART_QUANTITY, quantity)
+      else next[id] = quantity
       return next
     })
   }
