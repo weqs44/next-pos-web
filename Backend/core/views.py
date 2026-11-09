@@ -281,10 +281,7 @@ def parse_lines(raw, manager):
         pid, qty = row.get('productId'), row.get('qty')
         if type(pid) is not int or type(qty) is not int or not (0 < pid < 2**62): return None, 'Baris pesanan tidak valid.'
         if qty < 1: return None, 'Jumlah menu minimal 1.'
-        if qty > settings.POS_MAX_LINE_QTY: return None, f'Jumlah per menu maksimal {settings.POS_MAX_LINE_QTY}.'
         quantities[pid] = quantities.get(pid, 0) + qty
-    if any(q > settings.POS_MAX_LINE_QTY for q in quantities.values()):
-        return None, f'Jumlah per menu maksimal {settings.POS_MAX_LINE_QTY}.'
     products = {p.pk: p for p in Product.objects.filter(owner=manager, active=True, pk__in=list(quantities))}
     if len(products) != len(quantities): return None, 'Ada menu yang tidak tersedia atau sudah dinonaktifkan. Muat ulang halaman.'
     return [(products[pid], qty) for pid, qty in quantities.items()], None
