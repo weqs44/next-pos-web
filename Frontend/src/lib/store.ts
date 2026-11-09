@@ -93,6 +93,16 @@ export function currentShiftStats(cashierId:string):ShiftStats|null{const s=acti
 export function cashierSummaries(since=0):CashierSummary[]{const now=Date.now();return listCashiers().map(account=>{const ownShifts=shifts.filter(s=>s.cashierId===account.id&&(s.endedAt??now)>=since),stats=ownShifts.map(s=>shiftStats(s,transactions,now)),activeShift=ownShifts.find(s=>s.endedAt===null)||null;const orders=stats.reduce((n,s)=>n+s.orders,0),items=stats.reduce((n,s)=>n+s.items,0),sales=stats.reduce((n,s)=>n+s.sales,0),durationMs=stats.reduce((n,s)=>n+s.durationMs,0);return{account,activeShift,shifts:ownShifts.length,orders,items,sales,avgTicket:orders?sales/orders:0,ordersPerHour:durationMs?orders/(durationMs/HOUR):0,durationMs,recent:stats.slice(0,5)}})}
 export async function ensureSeed():Promise<void>{if(token()){try{await refresh()}catch(e){console.error('API bootstrap failed:',e)}}}
 export function listProducts(){return products}
+export async function updateProduct(id:number, changes:Partial<Omit<Product,'id'>>):Promise<Result<Product>>{
+  try{
+    const updated=await api<Product>('/products/',{method:'PATCH',body:JSON.stringify({id,...changes})})
+    products=products.map(p=>p.id===id?updated:p)
+    saveCache()
+    return{ok:true,value:updated}
+  }catch(e){
+    return{ok:false,error:(e as Error).message}
+  }
+}
 export async function addProduct(input:Omit<Product,'id'>):Promise<Result<Product>>{try{const p=await api<Product>('/products/',{method:'POST',body:JSON.stringify(input)});products=[...products,p];saveCache();return{ok:true,value:p}}catch(e){return{ok:false,error:(e as Error).message}}}
 export function toggleProduct(id:number):Result<true>{const p=products.find(x=>x.id===id);if(!p)return{ok:false,error:'Menu tidak ditemukan.'};products=products.map(x=>x.id===id?{...x,active:!x.active}:x);saveCache();void api('/products/',{method:'PATCH',body:JSON.stringify({id,active:!p.active})}).catch(e=>fail('Gagal menyimpan perubahan menu.',e));return{ok:true,value:true}}
 export function deleteProduct(id:number):Result<true>{products=products.filter(x=>x.id!==id);saveCache();void api('/products/',{method:'DELETE',body:JSON.stringify({id})}).catch(e=>fail('Gagal menghapus menu.',e));return{ok:true,value:true}}
