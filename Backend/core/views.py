@@ -85,14 +85,26 @@ def round_half_up(value):
     return int(Decimal(value).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
 
+_health_db_ok_until = 0.0  # time.monotonic() sampai kapan hasil cek DB yang sukses dipercaya
+
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+
     def get(self, request):
-        try:
-            connection.ensure_connection()
-        except Exception:
-            return Response({'status': 'error', 'service': 'NEXT POS API'}, status=503)
+        # Probe Kubernetes memanggil endpoint ini beberapa kali per menit. Membuka koneksi ke TiDB di
+        # setiap probe memakai Request Unit terus-menerus walau tidak ada pengguna. Hasil cek DB yang
+        # sukses dipakai ulang selama HEALTH_DB_CHECK_TTL detik (bawaan 300; 0 = selalu cek).
+        # Kegagalan tidak pernah di-cache, jadi 503 tetap langsung muncul saat DB bermasalah.
+        global _health_db_ok_until
+        now = time.monotonic()
+        if now >= _health_db_ok_until:
+            try:
+                connection.ensure_connection()
+            except Exception:
+                return Response({'status': 'error', 'service': 'NEXT POS API'}, status=503)
+            _health_db_ok_until = now + max(0, int(getattr(settings, 'HEALTH_DB_CHECK_TTL', 300)))
         return Response({'status': 'ok', 'service': 'NEXT POS API'})
 
 class RegisterManagerView(APIView):

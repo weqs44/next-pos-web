@@ -16,4 +16,5 @@ USER app
 EXPOSE 8000
 # Di dalam container, percayai proxy di jaringan Docker/ingress.
 ENV FORWARDED_ALLOW_IPS="*"
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn nextpos.wsgi:application --config gunicorn.conf.py"]
+# start.sh menjalankan migrate hanya bila ada migrasi tertunda, lalu gunicorn.
+CMD ["sh", "start.sh"]
