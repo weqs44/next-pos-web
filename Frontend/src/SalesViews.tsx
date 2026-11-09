@@ -271,7 +271,7 @@ export function ReportView({
     return () => {
       current = false
     }
-  }, [dateKey, timezone, transactions])
+  }, [dateKey, timezone])
 
   const slots = hourly
     ? Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, index) => {
