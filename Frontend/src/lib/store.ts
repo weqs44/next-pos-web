@@ -35,6 +35,7 @@ let nextNumber:number=Number(getItem(KEYS.nextNumber))||0
 let taxRate:number=(()=>{const raw=getItem(KEYS.taxRate);const n=raw===null?NaN:Number(raw);return Number.isFinite(n)&&n>=0&&n<1?n:0.11})()
 let sessionNotice=''
 let version=0;const listeners=new Set<()=>void>();const pendingShiftStarts=new Map<string,Promise<unknown>>()
+let bootstrapRequest:{token:string;promise:Promise<void>}|null=null
 const messageListeners=new Set<(message:string)=>void>()
 /** Pesan dari lapisan data (mis. gagal menyimpan) untuk ditampilkan UI sebagai toast. */
 export function subscribeMessages(fn:(message:string)=>void){messageListeners.add(fn);return()=>{messageListeners.delete(fn)}}
@@ -53,7 +54,7 @@ export function useStoreVersion(){return useSyncExternalStore(subscribe,()=>vers
 function clearCache(){accounts=[];shifts=[];transactions=[];products=[];nextNumber=0;[KEYS.cashiers,KEYS.shifts,KEYS.transactions,KEYS.products,KEYS.nextNumber].forEach(removeItem)}
 function saveCache(){setItem(KEYS.cashiers,JSON.stringify(accounts));setItem(KEYS.shifts,JSON.stringify(shifts));setItem(KEYS.transactions,JSON.stringify(transactions));setItem(KEYS.products,JSON.stringify(products));setItem(KEYS.nextNumber,String(nextNumber));emit()}
 function cacheBootstrap(data:any){accounts=[...(data.cashiers||[])];const me=data.account as Account;if(me&&!accounts.some(a=>a.id===me.id))accounts.push(me);shifts=data.shifts||[];transactions=data.transactions||[];products=data.products||[];if(typeof data.nextOrderNumber==='number')nextNumber=data.nextOrderNumber;if(typeof data.taxRate==='number'&&data.taxRate>=0&&data.taxRate<1){taxRate=data.taxRate;setItem(KEYS.taxRate,String(taxRate))};if(me)setItem(KEYS.account,JSON.stringify(me));saveCache()}
-async function refresh(){if(!token())return;const data=await api<any>('/bootstrap/');cacheBootstrap(data)}
+function refresh():Promise<void>{const currentToken=token();if(!currentToken)return Promise.resolve();if(bootstrapRequest?.token===currentToken)return bootstrapRequest.promise;const promise=api<any>('/bootstrap/').then(data=>{if(token()===currentToken)cacheBootstrap(data)}).finally(()=>{if(bootstrapRequest?.promise===promise)bootstrapRequest=null});bootstrapRequest={token:currentToken,promise};return promise}
 export function startOfToday(){const d=new Date();d.setHours(0,0,0,0);return d.getTime()}
 export function currentAccount():Account|null {if(!token())return null;return parse<Account|null>(KEYS.account,null)}
 export function logout(){const t=token();if(t) void api('/auth/logout/',{method:'POST'}).catch(()=>{});removeItem(KEYS.token);removeItem(KEYS.account);clearCache();emit()}
@@ -73,7 +74,7 @@ export function updateProfile(accountId:string,changes:{name:string;title:string
 export function listCashiers(){return accounts.filter(a=>a.role==='cashier')}
 export function listShifts(since=0){return shifts.filter(s=>(s.endedAt??Date.now())>=since).sort((a,b)=>b.startedAt-a.startedAt)}
 export function activeShift(cashierId:string){return shifts.find(s=>s.cashierId===cashierId&&s.endedAt===null)??null}
-export function startShift(cashierId:string):Shift{let s=activeShift(cashierId);if(s&&Date.now()-s.startedAt<14*HOUR)return s;if(s){shifts=shifts.map(x=>x.id===s!.id?{...x,endedAt:x.startedAt+14*HOUR}:x)}s={id:`local-${Date.now()}`,cashierId,startedAt:Date.now(),endedAt:null};shifts=[s,...shifts];saveCache();const pending=api<Shift>('/shifts/',{method:'POST',body:JSON.stringify({action:'start'})}).then(async saved=>{shifts=shifts.map(x=>x.id===s!.id?saved:x);saveCache();await refresh();return saved}).catch(error=>{fail('Gagal memulai shift.',error);throw error}).finally(()=>pendingShiftStarts.delete(cashierId));pending.catch(()=>{});pendingShiftStarts.set(cashierId,pending);return s}
+export function startShift(cashierId:string):Shift{let s=activeShift(cashierId);if(s&&Date.now()-s.startedAt<14*HOUR)return s;if(s){shifts=shifts.map(x=>x.id===s!.id?{...x,endedAt:x.startedAt+14*HOUR}:x)}s={id:`local-${Date.now()}`,cashierId,startedAt:Date.now(),endedAt:null};shifts=[s,...shifts];saveCache();const pending=api<Shift>('/shifts/',{method:'POST',body:JSON.stringify({action:'start'})}).then(saved=>{shifts=shifts.map(x=>x.id===s!.id?saved:x);saveCache();return saved}).catch(error=>{fail('Gagal memulai shift.',error);throw error}).finally(()=>pendingShiftStarts.delete(cashierId));pending.catch(()=>{});pendingShiftStarts.set(cashierId,pending);return s}
 export function endShift(cashierId:string,endedAt=Date.now()):Shift|null{const s=activeShift(cashierId);if(!s)return null;const closed={...s,endedAt};shifts=shifts.map(x=>x.id===s.id?closed:x);saveCache();void api('/shifts/',{method:'POST',body:JSON.stringify({action:'end'})}).catch(e=>fail('Gagal mengakhiri shift.',e));return closed}
 // Nomor pesanan berurutan per manajer; angka resmi datang dari server (nextOrderNumber), data lokal hanya cadangan.
 export function nextOrderNumber(){const nums=transactions.map(t=>t.number);const local=nums.length?Math.max(...nums)+1:1;return Math.max(nextNumber,local)}
