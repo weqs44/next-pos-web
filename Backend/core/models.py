@@ -1,8 +1,9 @@
 from django.conf import settings
 from django.db import models
 
+
 class Employee(models.Model):
-    ROLE_CHOICES = [('manager','manager'),('cashier','cashier')]
+    ROLE_CHOICES = [('manager', 'manager'), ('cashier', 'cashier')]
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='employee')
     title = models.CharField(max_length=120, default='Kasir')
     role = models.CharField(max_length=12, choices=ROLE_CHOICES, default='cashier')
@@ -11,12 +12,26 @@ class Employee(models.Model):
     email_verified = models.BooleanField(default=False)
     created_at = models.BigIntegerField()
     created_by = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='created_employees')
-    def __str__(self): return self.user.email
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['created_by', 'role'], name='emp_creator_role_idx'),
+        ]
+
+    def __str__(self):
+        return self.user.email
+
 
 class Shift(models.Model):
     cashier = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name='shifts')
     started_at = models.BigIntegerField()
     ended_at = models.BigIntegerField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['cashier', 'started_at'], name='shift_cashier_started_idx'),
+        ]
+
 
 class Transaction(models.Model):
     # Nomor pesanan berurutan PER MANAJER (restoran): pesanan manajer A tidak memengaruhi nomor manajer B.
@@ -32,8 +47,16 @@ class Transaction(models.Model):
     total = models.PositiveIntegerField()
     order_type = models.CharField(max_length=40)
     guest_count = models.PositiveIntegerField(null=True, blank=True, default=None)
+
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['manager','number'], name='unique_order_number_per_manager')]
+        constraints = [
+            models.UniqueConstraint(fields=['manager', 'number'], name='unique_order_number_per_manager'),
+        ]
+        indexes = [
+            models.Index(fields=['manager', 'at'], name='tx_manager_at_idx'),
+            models.Index(fields=['cashier', 'at'], name='tx_cashier_at_idx'),
+        ]
+
 
 class TransactionItem(models.Model):
     # Baris pesanan: nama & harga di-snapshot saat transaksi supaya laporan tetap benar walau menu diubah/dihapus.
@@ -42,6 +65,7 @@ class TransactionItem(models.Model):
     name = models.CharField(max_length=120)
     unit_price = models.PositiveIntegerField()
     quantity = models.PositiveIntegerField()
+
 
 class Product(models.Model):
     owner = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.CASCADE, related_name='products')
