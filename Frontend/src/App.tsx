@@ -27,6 +27,7 @@ import {
   updateProfile,
   listProducts,
   addProduct,
+  updateProduct as updateStoredProduct,
   toggleProduct,
   deleteProduct as deleteStoredProduct,
   useStoreVersion,
@@ -91,40 +92,82 @@ function WorkspaceView({
   products,
   query,
   onAddProduct,
+  onUpdateProduct,
   onToggleProduct,
   onDeleteProduct,
 }: {
   products: Product[]
   query: string
-  onAddProduct: (product: Omit<Product, "id">) => void
+  onAddProduct: (product: Omit<Product, "id">) => Promise<boolean>
+  onUpdateProduct: (product: Product) => Promise<boolean>
   onToggleProduct: (id: number) => void
   onDeleteProduct: (id: number) => void
 }) {
   const [formOpen, setFormOpen] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
   const [productCategory, setProductCategory] = useState("Makanan berat")
   const [image, setImage] = useState("")
 
-  function submitProduct(event: React.FormEvent) {
-    event.preventDefault()
-    const parsedPrice = Number(price)
-    if (!name.trim() || !parsedPrice) return
-    onAddProduct({
-      name: name.trim(),
-      description: description.trim() || "Menu baru",
-      price: parsedPrice,
-      category: productCategory,
-      image: image,
-      tag: "Baru",
-      active: true,
-    })
+  function resetForm() {
+    setEditingId(null)
     setName("")
     setDescription("")
     setPrice("")
+    setProductCategory("Makanan berat")
     setImage("")
     setFormOpen(false)
+  }
+
+  function startEditing(product: Product) {
+    setEditingId(product.id)
+    setName(product.name)
+    setDescription(product.description)
+    setPrice(String(product.price))
+    setProductCategory(product.category)
+    setImage(product.image)
+    setFormOpen(true)
+  }
+
+  async function submitProduct(event: React.FormEvent) {
+    event.preventDefault()
+    const parsedPrice = Number(price)
+    if (!name.trim() || !Number.isSafeInteger(parsedPrice) || parsedPrice < 1) {
+      notify("Masukkan nama menu dan harga yang valid.")
+      return
+    }
+
+    const editingProduct = editingId === null
+      ? null
+      : products.find((product) => product.id === editingId)
+    if (editingId !== null && !editingProduct) {
+      notify("Menu yang akan diedit tidak ditemukan. Muat ulang daftar menu.")
+      resetForm()
+      return
+    }
+
+    const saved = editingId === null
+      ? await onAddProduct({
+          name: name.trim(),
+          description: description.trim() || "Menu baru",
+          price: parsedPrice,
+          category: productCategory,
+          image,
+          tag: "Baru",
+          active: true,
+        })
+      : await onUpdateProduct({
+          ...editingProduct!,
+          name: name.trim(),
+          description: description.trim(),
+          price: parsedPrice,
+          category: productCategory,
+          image,
+        })
+
+    if (saved) resetForm()
   }
 
   async function readImage(event: React.ChangeEvent<HTMLInputElement>) {
@@ -146,11 +189,23 @@ function WorkspaceView({
         <div>
           <span className="eyebrow">Katalog</span>
           <h2>Kelola menu</h2>
-          <p>Tambah, nonaktifkan, atau hapus menu yang dijual.</p>
+          <p>Tambah, edit, nonaktifkan, atau hapus menu yang dijual.</p>
         </div>
         <button
           className="workspace-primary"
-          onClick={() => setFormOpen((current) => !current)}
+          onClick={() => {
+            if (formOpen) resetForm()
+            else {
+              setEditingId(null)
+              setName("")
+              setDescription("")
+              setPrice("")
+              setProductCategory("Makanan berat")
+              setImage("")
+              setFormOpen(true)
+            }
+          }}
+          type="button"
         >
           <Icon name={formOpen ? "close" : "plus"} size={17} />{" "}
           {formOpen ? "Tutup" : "Tambah menu"}
@@ -192,7 +247,7 @@ function WorkspaceView({
               <label>
                 <span>Harga</span>
                 <input
-                  min="1000"
+                  min="1"
                   onChange={(event) => setPrice(event.target.value)}
                   placeholder="50000"
                   required
@@ -212,9 +267,16 @@ function WorkspaceView({
                 </select>
               </label>
             </div>
-            <button className="save-product" type="submit">
-              Simpan menu
-            </button>
+            <div className="product-form-actions">
+              <button className="save-product" type="submit">
+                {editingId === null ? "Simpan menu" : "Simpan perubahan"}
+              </button>
+              {editingId !== null && (
+                <button className="toggle-button" onClick={resetForm} type="button">
+                  Batal edit
+                </button>
+              )}
+            </div>
           </div>
         </form>
       )}
@@ -226,39 +288,48 @@ function WorkspaceView({
               .includes(query.trim().toLowerCase()),
           )
           .map((product) => (
-          <article
-            className={!product.active ? "menu-disabled" : ""}
-            key={product.id}
-          >
-            <img alt={product.name} src={product.image || PLACEHOLDER_IMAGE} />
-            <div>
-              <strong>{product.name}</strong>
-              <span>
-                {product.category} · {rupiah.format(product.price)}
+            <article
+              className={!product.active ? "menu-disabled" : ""}
+              key={product.id}
+            >
+              <img alt={product.name} src={product.image || PLACEHOLDER_IMAGE} />
+              <div>
+                <strong>{product.name}</strong>
+                <span>
+                  {product.category} · {rupiah.format(product.price)}
+                </span>
+              </div>
+              <span
+                className={
+                  product.active ? "availability active" : "availability"
+                }
+              >
+                {product.active ? "Aktif" : "Nonaktif"}
               </span>
-            </div>
-            <span
-              className={
-                product.active ? "availability active" : "availability"
-              }
-            >
-              {product.active ? "Aktif" : "Nonaktif"}
-            </span>
-            <button
-              className="toggle-button"
-              onClick={() => onToggleProduct(product.id)}
-            >
-              {product.active ? "Nonaktifkan" : "Aktifkan"}
-            </button>
-            <button
-              aria-label={`Hapus ${product.name}`}
-              className="delete-menu"
-              onClick={() => onDeleteProduct(product.id)}
-            >
-              <Icon name="trash" size={18} />
-            </button>
-          </article>
-        ))}
+              <button
+                className="toggle-button"
+                onClick={() => onToggleProduct(product.id)}
+                type="button"
+              >
+                {product.active ? "Nonaktifkan" : "Aktifkan"}
+              </button>
+              <button
+                className="toggle-button"
+                onClick={() => startEditing(product)}
+                type="button"
+              >
+                Edit
+              </button>
+              <button
+                aria-label={`Hapus ${product.name}`}
+                className="delete-menu"
+                onClick={() => onDeleteProduct(product.id)}
+                type="button"
+              >
+                <Icon name="trash" size={18} />
+              </button>
+            </article>
+          ))}
       </div>
     </section>
   )
@@ -834,11 +905,21 @@ export default function App() {
     setCart((current) => { const next = { ...current }; delete next[id]; return next })
   }
 
-  async function createProduct(product: Omit<Product, "id">) {
+  async function createProduct(product: Omit<Product, "id">): Promise<boolean> {
     const result = await addProduct(product)
-    if (!result.ok) { setMessage(result.error); return }
+    if (!result.ok) { setMessage(result.error); return false }
     setProducts(listProducts())
     setMessage("Menu berhasil ditambahkan")
+    return true
+  }
+
+  async function saveProductChanges(product: Product): Promise<boolean> {
+    const { id, name, description, price, category, image, tag, active } = product
+    const result = await updateStoredProduct(id, { name, description, price, category, image, tag, active })
+    if (!result.ok) { setMessage(result.error); return false }
+    setProducts(listProducts())
+    setMessage("Perubahan menu berhasil disimpan")
+    return true
   }
 
   function changeProductStatus(id: number) {
@@ -1457,6 +1538,7 @@ export default function App() {
         ) : (
           <WorkspaceView
             onAddProduct={createProduct}
+            onUpdateProduct={saveProductChanges}
             onDeleteProduct={deleteProduct}
             onToggleProduct={changeProductStatus}
             products={products}
