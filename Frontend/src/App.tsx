@@ -139,6 +139,15 @@ function WorkspaceView({
       return
     }
 
+    const editingProduct = editingId === null
+      ? null
+      : products.find((product) => product.id === editingId)
+    if (editingId !== null && !editingProduct) {
+      notify("Menu yang akan diedit tidak ditemukan. Muat ulang daftar menu.")
+      resetForm()
+      return
+    }
+
     const saved = editingId === null
       ? await onAddProduct({
           name: name.trim(),
@@ -150,7 +159,7 @@ function WorkspaceView({
           active: true,
         })
       : await onUpdateProduct({
-          ...products.find((product) => product.id === editingId)!,
+          ...editingProduct!,
           name: name.trim(),
           description: description.trim(),
           price: parsedPrice,
