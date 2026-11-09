@@ -145,6 +145,9 @@ REST_FRAMEWORK = {
 if os.getenv('CACHE_DB_TABLE'):
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.db.DatabaseCache', 'LOCATION': os.getenv('CACHE_DB_TABLE')}}
 
+# Detik hasil cek DB yang sukses di /api/health/ dipakai ulang (hemat Request Unit TiDB; 0 = selalu cek).
+HEALTH_DB_CHECK_TTL = int(os.getenv('HEALTH_DB_CHECK_TTL', '300'))
+
 # ---- Aturan bisnis POS (dihitung SERVER, tidak pernah dipercaya dari klien) ----
 POS_TAX_RATE = float(os.getenv('POS_TAX_RATE', '0.11'))
 POS_MAX_DISCOUNT_PERCENT = float(os.getenv('POS_MAX_DISCOUNT_PERCENT', '100'))
